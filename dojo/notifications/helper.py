@@ -194,20 +194,45 @@ def send_slack_notification(event, user=None, *args, **kwargs):
     from dojo.utils import get_system_setting
 
     def _post_slack_message(channel):
-        res = requests.request(
-            method="POST",
-            url="https://slack.com/api/chat.postMessage",
-            data={
-                "token": get_system_setting("slack_token"),
-                "channel": channel,
-                "username": get_system_setting("slack_username"),
-                "text": create_notification_message(event, user, "slack", *args, **kwargs),
-            })
+        
+        ROCKETCHAT_URL = settings.ROCKET_CHAT_URL
+        webhook_url = "{}/hooks/{}".format(ROCKETCHAT_URL,get_system_setting('slack_token'))
+        webhook_token = (
+            get_system_setting('slack_token')
+        )
+        message_data = {
+            "channel": channel,
+            "text": create_notification_message(event, user, 'slack', *args, **kwargs),
+            "username": get_system_setting('slack_username')
+        }
 
-        if "error" in res.text:
+        headers = {
+            "Content-Type": "application/json",
+            "X-RocketChat-Hook": webhook_token,
+        }
+
+        response = requests.post(webhook_url, json=message_data, headers=headers)
+
+
+        if response.status_code != 200:
             logger.error("Slack is complaining. See raw text below.")
-            logger.error(res.text)
-            raise RuntimeError("Error posting message to Slack: " + res.text)
+            logger.error(response.text)
+            raise RuntimeError('Error posting message to Slack: ' + response.text)
+
+        # res = requests.request(
+        #     method="POST",
+        #     url="https://slack.com/api/chat.postMessage",
+        #     data={
+        #         "token": get_system_setting("slack_token"),
+        #         "channel": channel,
+        #         "username": get_system_setting("slack_username"),
+        #         "text": create_notification_message(event, user, "slack", *args, **kwargs),
+        #     })
+
+        # if "error" in res.text:
+        #     logger.error("Slack is complaining. See raw text below.")
+        #     logger.error(res.text)
+        #     raise RuntimeError("Error posting message to Slack: " + res.text)
 
     try:
         # If the user has slack information on profile and chooses to receive slack notifications
@@ -335,39 +360,40 @@ def send_alert_notification(event, user=None, *args, **kwargs):
 
 
 def get_slack_user_id(user_email):
-    import json
+    return user_email
+    # import json
 
-    from dojo.utils import get_system_setting
+    # from dojo.utils import get_system_setting
 
-    user_id = None
+    # user_id = None
 
-    res = requests.request(
-        method="POST",
-        url="https://slack.com/api/users.lookupByEmail",
-        data={"token": get_system_setting("slack_token"), "email": user_email})
+    # res = requests.request(
+    #     method="POST",
+    #     url="https://slack.com/api/users.lookupByEmail",
+    #     data={"token": get_system_setting("slack_token"), "email": user_email})
 
-    user = json.loads(res.text)
+    # user = json.loads(res.text)
 
-    slack_user_is_found = False
-    if user:
-        if "error" in user:
-            logger.error("Slack is complaining. See error message below.")
-            logger.error(user)
-            raise RuntimeError("Error getting user list from Slack: " + res.text)
-        else:
-            if "email" in user["user"]["profile"]:
-                if user_email == user["user"]["profile"]["email"]:
-                    if "id" in user["user"]:
-                        user_id = user["user"]["id"]
-                        logger.debug(f"Slack user ID is {user_id}")
-                        slack_user_is_found = True
-                else:
-                    logger.warning(f"A user with email {user_email} could not be found in this Slack workspace.")
+    # slack_user_is_found = False
+    # if user:
+    #     if "error" in user:
+    #         logger.error("Slack is complaining. See error message below.")
+    #         logger.error(user)
+    #         raise RuntimeError("Error getting user list from Slack: " + res.text)
+    #     else:
+    #         if "email" in user["user"]["profile"]:
+    #             if user_email == user["user"]["profile"]["email"]:
+    #                 if "id" in user["user"]:
+    #                     user_id = user["user"]["id"]
+    #                     logger.debug(f"Slack user ID is {user_id}")
+    #                     slack_user_is_found = True
+    #             else:
+    #                 logger.warning(f"A user with email {user_email} could not be found in this Slack workspace.")
 
-            if not slack_user_is_found:
-                logger.warning("The Slack user was not found.")
+    #         if not slack_user_is_found:
+    #             logger.warning("The Slack user was not found.")
 
-    return user_id
+    # return user_id
 
 
 def log_alert(e, notification_type=None, *args, **kwargs):
