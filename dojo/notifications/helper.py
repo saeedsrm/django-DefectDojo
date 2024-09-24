@@ -215,9 +215,9 @@ def send_slack_notification(event, user=None, *args, **kwargs):
 
 
         if response.status_code != 200:
-            logger.error("Slack is complaining. See raw text below.")
+            logger.error("RocketChat is complaining. See raw text below.")
             logger.error(response.text)
-            raise RuntimeError('Error posting message to Slack: ' + response.text)
+            raise RuntimeError('Error posting message to RocketChat: ' + response.text)
 
         # res = requests.request(
         #     method="POST",
