@@ -1,9 +1,8 @@
+import collections
 import json
 import logging
-import os
 import re
 from datetime import datetime
-from typing import List
 
 import six
 import tagulous
@@ -282,10 +281,10 @@ class TaggitSerializer(serializers.Serializer):
         return (to_be_tagged, validated_data)
 
 
-class RequestResponseDict(list):
+class RequestResponseDict(collections.UserList):
     def __init__(self, *args, **kwargs):
         pretty_print = kwargs.pop("pretty_print", True)
-        list.__init__(self, *args, **kwargs)
+        collections.UserList.__init__(self, *args, **kwargs)
         self.pretty_print = pretty_print
 
     def __add__(self, rhs):
@@ -804,20 +803,8 @@ class FileSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if file := data.get("file"):
-            ext = os.path.splitext(file.name)[1]  # [0] returns path+filename
-            valid_extensions = settings.FILE_UPLOAD_TYPES
-            if ext.lower() not in valid_extensions:
-                if accepted_extensions := f"{', '.join(valid_extensions)}":
-                    msg = (
-                        "Unsupported extension. Supported extensions are as "
-                        f"follows: {accepted_extensions}"
-                    )
-                else:
-                    msg = (
-                        "File uploads are prohibited due to the list of acceptable "
-                        "file extensions being empty"
-                    )
-                raise ValidationError(msg)
+            # the clean will validate the file extensions and raise a Validation error if the extensions are not accepted
+            FileUpload(title=file.name, file=file).clean()
             return data
         return None
 
@@ -1517,7 +1504,7 @@ class RiskAcceptanceSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, data):
-        def validate_findings_have_same_engagement(finding_objects: List[Finding]):
+        def validate_findings_have_same_engagement(finding_objects: list[Finding]):
             engagements = finding_objects.values_list("test__engagement__id", flat=True).distinct().count()
             if engagements > 1:
                 msg = "You are not permitted to add findings from multiple engagements"
@@ -2043,7 +2030,7 @@ class ProductSerializer(TaggitSerializer, serializers.ModelSerializer):
         return obj.findings_count
 
     # TODO: maybe extend_schema_field is needed here?
-    def get_findings_list(self, obj) -> List[int]:
+    def get_findings_list(self, obj) -> list[int]:
         return obj.open_findings_list
 
 
@@ -2258,6 +2245,13 @@ class CommonImportScanSerializer(serializers.Serializer):
             if context.get("scan_date")
             else None
         )
+
+        # engagement end date was not being used at all and so target_end would also turn into None
+        # in this case, do not want to change target_end unless engagement_end exists
+        eng_end_date = context.get("engagement_end_date", None)
+        if eng_end_date:
+            context["target_end"] = context.get("engagement_end_date")
+
         return context
 
 

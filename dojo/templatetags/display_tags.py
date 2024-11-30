@@ -328,7 +328,10 @@ def action_log_entry(value, autoescape=None):
     history = json.loads(value)
     text = ""
     for k in history.keys():
-        text += k.capitalize() + ' changed from "' + \
+        if isinstance(history[k], dict):
+            text += k.capitalize() + " operation: " + history[k].get("operation", "unknown") + ": " + str(history[k].get("objects", "unknown"))
+        else:
+            text += k.capitalize() + ' changed from "' + \
                 history[k][0] + '" to "' + history[k][1] + '"\n'
     return text
 
@@ -780,8 +783,15 @@ def vulnerability_url(vulnerability_id):
 
     for key in settings.VULNERABILITY_URLS:
         if vulnerability_id.upper().startswith(key):
+            if key in ["AVD", "KHV", "C-"]:
+                return settings.VULNERABILITY_URLS[key] + str(vulnerability_id.lower())
             if "&&" in settings.VULNERABILITY_URLS[key]:
-                return settings.VULNERABILITY_URLS[key].split("&&")[0] + str(vulnerability_id) + settings.VULNERABILITY_URLS[key].split("&&")[1]
+                # Process specific keys specially if need
+                if key in ["CAPEC", "CWE"]:
+                    vuln_id = str(vulnerability_id).replace(f"{key}-", "")
+                else:
+                    vuln_id = str(vulnerability_id)
+                return f'{settings.VULNERABILITY_URLS[key].split("&&")[0]}{vuln_id}{settings.VULNERABILITY_URLS[key].split("&&")[1]}'
             return settings.VULNERABILITY_URLS[key] + str(vulnerability_id)
     return ""
 
